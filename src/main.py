@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
 from datasets import RecWithContrastiveLearningDataset
 
-from trainers import ECGANRecTrainer
+from trainers_cyc import ECGANRecTrainer
 from models import SASRecModel, OfflineItemSimilarity, OnlineItemSimilarity
 from utils import EarlyStopping, get_user_seqs, check_path, set_seed
 
@@ -218,37 +218,12 @@ def main():
     test_sampler = SequentialSampler(test_dataset)
     test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
 
-    # args = update_to_module_parameters(args, m_type = 'gen')
-    # generator = SASRecModel(args=args)
-    # args = update_to_module_parameters(args, m_type = 'dis')
-    # discriminator = SASRecModel(args=args)
-    #
-    # # model = SASRecModel(args=args)
-    #
-    # # weight tie the item and positional embeddings
-    # if args.model_shared_type == 'embed_only':
-    #     discriminator.item_embeddings = generator.item_embeddings
-    #     discriminator.position_embeddings = generator.position_embeddings
-    #     discriminator.LayerNorm = generator.LayerNorm
-    #     discriminator.dropout = generator.dropout
-    # elif args.model_shared_type == 'encoder_only':
-    #     discriminator.item_encoder = generator.item_encoder
-    # elif args.model_shared_type == 'full':
-    #     discriminator.item_embeddings = generator.item_embeddings
-    #     discriminator.position_embeddings = generator.position_embeddings
-    #     discriminator.item_encoder = generator.item_encoder
-    #     discriminator.LayerNorm = generator.LayerNorm
-    #     discriminator.dropout = generator.dropout
-    # else:
-    #     print("isolated models")
     args = update_to_module_parameters(args, m_type='gen')
     generator_A = SASRecModel(args=args)
     generator_B = SASRecModel(args=args)
-    generator_C = SASRecModel(args=args)
     args = update_to_module_parameters(args, m_type='dis')
     discriminator_A = SASRecModel(args=args)
     discriminator_B = SASRecModel(args=args)
-    discriminator_C = SASRecModel(args=args)
 
 
     if args.model_shared_type == 'embed_only':
@@ -280,16 +255,11 @@ def main():
         discriminator_A.dropout = generator_A.dropout
         discriminator_B.LayerNorm = generator_B.LayerNorm
         discriminator_B.dropout = generator_B.dropout
-        discriminator_C.item_embeddings = generator_C.item_embeddings
-        discriminator_C.position_embeddings = generator_C.position_embeddings
-        discriminator_C.item_encoder = generator_C.item_encoder
-        discriminator_C.LayerNorm = generator_C.LayerNorm
-        discriminator_C.dropout = generator_C.dropout
 
     else:
         print("isolated models")
 
-    trainer = ECGANRecTrainer(generator_A, generator_B, generator_C, discriminator_A, discriminator_B, discriminator_C, train_dataloader, eval_dataloader,
+    trainer = ECGANRecTrainer(generator_A, generator_B, discriminator_A, discriminator_B,  train_dataloader, eval_dataloader,
                              test_dataloader, args)
 
     if args.do_eval:
@@ -302,10 +272,7 @@ def main():
         print(f'Train ECGAN-Rec')
         early_stopping = EarlyStopping(args.checkpoint_path, patience=40, verbose=True)
         for epoch in range(args.epochs):
-            # trainer.train(epoch)
-            # # evaluate on NDCG@20
-            # scores, _ = trainer.valid(epoch, full_sort=True)
-            # early_stopping(np.array(scores[-1:]), trainer.discriminator)
+
             args.train_matrix = valid_rating_matrix
             trainer.train(epoch)
             # evaluate on NDCG@20
