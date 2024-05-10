@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
 from datasets import RecWithContrastiveLearningDataset
 
-from trainers_cyc import ECGANRecTrainer
+from trainers import ECGANRecTrainer
 from models import SASRecModel, OfflineItemSimilarity, OnlineItemSimilarity
 from utils import EarlyStopping, get_user_seqs, check_path, set_seed
 
@@ -49,7 +49,7 @@ def main():
     parser.add_argument('--data_name', default='Sports_and_Outdoors', type=str)
     parser.add_argument('--do_eval', action='store_true')
     parser.add_argument('--model_idx', default=0, type=int, help="model idenfier 10, 20, 30...")
-    parser.add_argument("--gpu_id", type=str, default="1", help="gpu_id")
+    parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
 
     # data augmentation args
     parser.add_argument('--noise_ratio', default=0.0, type=float, \
@@ -73,7 +73,7 @@ def main():
                         help="default data augmentation types. Chosen from: \
                         mask, crop, reorder, substitute, insert, random, \
                         combinatorial_enumerate (for multi-view).")
-    parser.add_argument('--augment_type_for_short', default='SIM', type=str, \
+    parser.add_argument('--augment_type_for_short', default='SIMRC', type=str, \
                         help="data augmentation types for short sequences. Chosen from: \
                         SI, SIM, SIR, SIC, SIMR, SIMC, SIRC, SIMRC.")
     parser.add_argument("--tao", type=float, default=0.2, help="crop ratio for crop operator")
@@ -259,8 +259,7 @@ def main():
     else:
         print("isolated models")
 
-    trainer = ECGANRecTrainer(generator_A, generator_B, discriminator_A, discriminator_B,  train_dataloader, eval_dataloader,
-                             test_dataloader, args)
+    trainer = ECGANRecTrainer(generator_A, generator_B, discriminator_A, discriminator_B,  train_dataloader, eval_dataloader, test_dataloader, args)
 
     if args.do_eval:
         trainer.args.train_matrix = test_rating_matrix
@@ -272,29 +271,21 @@ def main():
         print(f'Train ECGAN-Rec')
         early_stopping = EarlyStopping(args.checkpoint_path, patience=40, verbose=True)
         for epoch in range(args.epochs):
-
             args.train_matrix = valid_rating_matrix
             trainer.train(epoch)
             # evaluate on NDCG@20
-
             scores, _ = trainer.valid(epoch, full_sort=True)
             trainer.args.train_matrix = test_rating_matrix
-
-            print("Discriminator_C:")
-            scores_test, _ = trainer.test(epoch, full_sort=True)
-
-            early_stopping(np.array(scores[-1:]), trainer.discriminator_A)
-            print("test_score:")
-
-            trainer.discriminator_A.load_state_dict(torch.load(args.checkpoint_path))
-            scores_test, _ = trainer.test(epoch, full_sort=True)
+            scores, _ = trainer.test(epoch, full_sort=True)
+            # early_stopping(np.array(scores[-1:]), trainer.discriminator)
+            early_stopping(np.array(scores[-1:]), trainer.discriminator_B)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
         trainer.args.train_matrix = test_rating_matrix
         print('---------------Change to test_rating_matrix!-------------------')
         # load the best model
-        trainer.discriminator_A.load_state_dict(torch.load(args.checkpoint_path))
+        trainer.discriminator_B.load_state_dict(torch.load(args.checkpoint_path))
         scores, result_info = trainer.test(0, full_sort=True)
 
     print(args_str)
