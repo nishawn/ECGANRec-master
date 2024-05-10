@@ -277,7 +277,6 @@ def main():
             scores, _ = trainer.valid(epoch, full_sort=True)
             trainer.args.train_matrix = test_rating_matrix
             scores, _ = trainer.test(epoch, full_sort=True)
-            # early_stopping(np.array(scores[-1:]), trainer.discriminator)
             early_stopping(np.array(scores[-1:]), trainer.discriminator_B)
             if early_stopping.early_stop:
                 print("Early stopping")
